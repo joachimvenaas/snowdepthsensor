@@ -1,10 +1,13 @@
 #!/usr/bin/python
 import RPi.GPIO as GPIO
 import time
-import statistics
+import requests
+import json
 
 PIN_TRIGGER = 16
 PIN_ECHO = 18
+URL = 'http://192.168.1.104:4321/data'
+
 GPIO.setmode(GPIO.BOARD)
 
 def measure():
@@ -13,7 +16,7 @@ def measure():
 
     GPIO.output(PIN_TRIGGER, GPIO.LOW)
 
-    time.sleep(1)
+    time.sleep(0.25)
 
     GPIO.output(PIN_TRIGGER, GPIO.HIGH)
     time.sleep(0.00001)
@@ -27,36 +30,19 @@ def measure():
     pulse_end_time = time.time()
 
     pulse_duration = pulse_end_time - pulse_start_time
-    distance = round(pulse_duration * 17150, 2)
-    return distance
+    # distance = round(pulse_duration * 17150, 2)
+    return pulse_duration
 
-
-def calculate_confidence(distances):
-    if len(distances) < 2:
-        return 0
-
-    mean_distance = sum(distances) / len(distances)
-    variance = sum((x - mean_distance) ** 2 for x in distances) / len(distances)
-    standard_deviation = variance ** 0.5
-
-    confidence = 100 - (standard_deviation / mean_distance) * 100
-
-    return max(0, confidence)
 
 distances = []
 for _ in range(0, 10):
     distance = measure()
     distances.append(distance)
 
-print("Distances:", distances)
+data = { "data": distances }
+headers = { 'Content-type': 'application/json' }
 
-# remove lowest and highest values
-distances.remove(min(distances))
-distances.remove(max(distances))
-
-confidence = round(calculate_confidence(distances))
-distance = round(statistics.median(distances), 1)
-
-print(f"Distance: {distance} cm | Confidence: {confidence} %")
+print("Sending data")
+r = requests.post(URL, data=json.dumps(data), headers=headers)
 
 GPIO.cleanup()
